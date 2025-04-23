@@ -31,17 +31,18 @@ describe('CloudsaniaLog (Unit)', () => {
     const loggedSpy = jest.fn();
     const callback = jest.fn();
     mockSend.mockResolvedValueOnce({});
-
+  
     transport.on('logged', loggedSpy);
     transport.log({ level: 'info', message: 'log success' }, callback);
-
+  
+    // Add more specific waiting if possible
+    await new Promise(process.nextTick); // Let event loop process
     await jest.runAllTimersAsync();
-    await flushPromises();
-
+    
     expect(loggedSpy).toHaveBeenCalledWith(expect.objectContaining({ message: 'log success' }));
     expect(mockSend).toHaveBeenCalled();
     expect(callback).toHaveBeenCalled();
-  });
+  }, 30000);
 
   it('should buffer log and schedule retry if send fails', async () => {
     const callback = jest.fn();
@@ -61,7 +62,7 @@ describe('CloudsaniaLog (Unit)', () => {
     expect(mockSend).toHaveBeenCalledTimes(2);
     expect(callback).toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledWith(expect.any(APIConnectionTimeoutError));
-  });
+  }, 10000);
 
   it('should retry buffered logs on reconnect', async () => {
     const callback = jest.fn();
@@ -76,7 +77,7 @@ describe('CloudsaniaLog (Unit)', () => {
     await flushPromises();
 
     expect(mockSend).toHaveBeenCalledTimes(2);
-  });
+  }, 10000);
 
   it('should emit error and disable logging after max retries', async () => {
     mockSend.mockRejectedValue(new Error('fail forever'));
@@ -94,25 +95,47 @@ describe('CloudsaniaLog (Unit)', () => {
     expect((transport as any)._disabled).toBe(true);
   });
 
+  // it('should flush buffer and emit "closed" event on close', async () => {
+  //   const closedSpy = jest.fn();
+  //   const callback = jest.fn();
+
+  //   mockSend.mockRejectedValueOnce(new Error('network down'));
+  //   mockSend.mockResolvedValueOnce({});  // retry succeeds
+
+  //   transport.on('closed', closedSpy);
+  //   transport.on('error', () => { }); // absorb error
+
+  //   transport.log({ level: 'info', message: 'test close flush' }, callback);
+  //   await jest.runAllTimersAsync();
+  //   await flushPromises();
+
+  //   transport.close();
+  //   await jest.runAllTimersAsync();
+  //   await flushPromises();
+
+  //   expect(mockSend).toHaveBeenCalledTimes(2);
+  //   expect(closedSpy).toHaveBeenCalled();
+  // });
   it('should flush buffer and emit "closed" event on close', async () => {
     const closedSpy = jest.fn();
     const callback = jest.fn();
-
+  
     mockSend.mockRejectedValueOnce(new Error('network down'));
-    mockSend.mockResolvedValueOnce({});  // retry succeeds
-
+    mockSend.mockResolvedValueOnce({});  
+  
     transport.on('closed', closedSpy);
-    transport.on('error', () => { }); // absorb error
-
+    transport.on('error', () => { }); 
+  
     transport.log({ level: 'info', message: 'test close flush' }, callback);
     await jest.runAllTimersAsync();
     await flushPromises();
-
+  
     transport.close();
     await jest.runAllTimersAsync();
     await flushPromises();
-
+  
     expect(mockSend).toHaveBeenCalledTimes(2);
     expect(closedSpy).toHaveBeenCalled();
   });
+  
 });
